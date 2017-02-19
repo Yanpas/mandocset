@@ -49,10 +49,11 @@ def createDocset(indir, out):
 		plist.write(getPlist(out))
 	with sqlite3.connect(out + '.docset/Contents/Resources/docSet.dsidx') as db:
 		db.execute("BEGIN")
-		db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT);')
-		db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, type, path);')
+		db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, dashtype TEXT, path TEXT);')
+		db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, dashtype, path);')
 		fldre = re.compile(r'\w*(\d)\w*')
 		manfre = re.compile(r'(.+?)\..*')
+		#dups = set()
 		for it in os.listdir(indir):
 			path1 = os.path.join(indir, it)
 			if os.path.isdir(path1):
@@ -66,8 +67,15 @@ def createDocset(indir, out):
 							toHtml(manf, out + '.docset/Contents/Resources/Documents')
 							fname = os.path.basename(manf) + '.html'
 							name_for_db = re.match(manfre, fname).group(1)
-							db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
-									[name_for_db, getType(mo.group(1)), fname])
+							mannumstr = mo.group(1)
+							dashtype = getType(mannumstr)
+							if dashtype == 'Object':
+								#if name_for_db in dups:
+									#print("DUP", name_for_db)
+								pass#name_for_db += ' ({})'.format(mannumstr)
+								#dups.add(name_for_db)
+							db.execute('INSERT OR IGNORE INTO searchIndex(name, dashtype, path) VALUES (?,?,?);',
+									[name_for_db, dashtype, fname])
 		db.commit()
 
 def main():
