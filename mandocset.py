@@ -49,7 +49,7 @@ def createDocset(indir, out):
 		db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, dashtype TEXT, path TEXT);')
 		db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, dashtype, path);')
 		fldre = re.compile(r'\w*(\d)\w*')
-		manfre = re.compile(r'(.+?)\..*')
+		manfre = re.compile(r'(.+)\..+')
 		#dups = set()
 		for it in os.listdir(indir):
 			path1 = os.path.join(indir, it)
@@ -63,7 +63,7 @@ def createDocset(indir, out):
 							print('\tmanf', jt)
 							toHtml(manf, out + '.docset/Contents/Resources/Documents')
 							fname = os.path.basename(manf) + '.html'
-							name_for_db = re.match(manfre, fname).group(1)
+							name_for_db = re.match(manfre, jt).group(1)
 							mannumstr = mo.group(1)
 							dashtype = getType(mannumstr)
 							if dashtype == 'Object':
