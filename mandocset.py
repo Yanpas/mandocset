@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 '''
 Created on 19 feb 2017
 
@@ -26,8 +27,10 @@ def getPlist(name):
 
 def toHtml(inf, outdir):
 	name = os.path.basename(inf)
+	#cont = proc.stdout.read().decode()
+	#cont, n = re.subn(r'HREF="[^"]*/(.*?)"', r'HREF="\1"', cont, flags=re.IGNORECASE)
 	with open(os.path.join(outdir, name) + '.html', 'wb') as f:
-		proc = subprocess.Popen(['man2html', inf, '-M', ''], stdout=f)
+		proc = subprocess.Popen(['man2html', inf, '-r'], stdout=f)
 
 def getType(numstr):
 	n = int(numstr)
@@ -46,8 +49,8 @@ def createDocset(indir, out):
 		plist.write(getPlist(out))
 	with sqlite3.connect(out + '.docset/Contents/Resources/docSet.dsidx') as db:
 		db.execute("BEGIN")
-		db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, dashtype TEXT, path TEXT);')
-		db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, dashtype, path);')
+		db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT);')
+		db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, type, path);')
 		fldre = re.compile(r'\w*(\d)\w*')
 		manfre = re.compile(r'(.+)\..+')
 		#dups = set()
@@ -57,12 +60,14 @@ def createDocset(indir, out):
 				mo = re.match(fldre, it)
 				if mo:
 					print('dir', it)
+					outdir = out + '.docset/Contents/Resources/Documents/' + it
+					os.mkdir(outdir)
 					for jt in os.listdir(path1):
 						manf = os.path.join(path1, jt)
 						if os.path.isfile(manf):
 							print('\tmanf', jt)
-							toHtml(manf, out + '.docset/Contents/Resources/Documents')
-							fname = os.path.basename(manf) + '.html'
+							toHtml(manf, outdir)
+							fname = os.path.join(it, os.path.basename(manf)) + '.html'
 							name_for_db = re.match(manfre, jt).group(1)
 							mannumstr = mo.group(1)
 							dashtype = getType(mannumstr)
@@ -71,7 +76,7 @@ def createDocset(indir, out):
 									#print("DUP", name_for_db)
 								pass#name_for_db += ' ({})'.format(mannumstr)
 								#dups.add(name_for_db)
-							db.execute('INSERT OR IGNORE INTO searchIndex(name, dashtype, path) VALUES (?,?,?);',
+							db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
 									[name_for_db, dashtype, fname])
 		db.commit()
 
