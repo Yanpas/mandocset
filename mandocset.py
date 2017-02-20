@@ -4,7 +4,7 @@ Created on 19 feb 2017
 @author: yanpas
 '''
 
-import sqlite3, argparse, os, sys, re
+import sqlite3, argparse, os, sys, re, subprocess
 from shutil import rmtree
 
 def getPlist(name):
@@ -25,12 +25,9 @@ def getPlist(name):
 '''.format(name)
 
 def toHtml(inf, outdir):
-	import subprocess
 	name = os.path.basename(inf)
-	outfile = os.path.join(outdir, name) + '.html'
-	proc = subprocess.Popen(['man2html', inf, '-M', ''], stdout=subprocess.PIPE)
-	with open(outfile, 'wb') as f:
-		f.write(proc.stdout.read())
+	with open(os.path.join(outdir, name) + '.html', 'wb') as f:
+		proc = subprocess.Popen(['man2html', inf, '-M', ''], stdout=f)
 
 def getType(numstr):
 	n = int(numstr)
