@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 '''
 Created on 19 feb 2017
+
+DocsetMaker
 
 @author: yanpas
 '''
 
 import sqlite3, argparse, os, sys, re, subprocess
-from shutil import rmtree
+import shutil
 
 def getPlist(name):
 	return '''<?xml version="1.0" encoding="UTF-8"?>
@@ -27,75 +30,88 @@ def getPlist(name):
 
 def toHtml(inf, outdir):
 	name = os.path.basename(inf)
-	#cont = proc.stdout.read().decode()
-	#cont, n = re.subn(r'HREF="[^"]*/(.*?)"', r'HREF="\1"', cont, flags=re.IGNORECASE)
 	with open(os.path.join(outdir, name) + '.html', 'wb') as f:
-		proc = subprocess.Popen(['man2html', inf, '-r'], stdout=f)
+		subprocess.Popen(['man2html', inf, '-r'], stdout=f)
 
-def getType(numstr):
-	n = int(numstr)
+def getType(n):
 	if n == 1:
 		return 'Command'
 	elif n == 2:
-		return 'Callback'
+		return 'Service' # Command and Callback have too similar icons
 	elif n == 3:
 		return 'Function'
 	else:
 		return 'Object'
 
-def createDocset(indir, out):
-	os.makedirs(out + '.docset/Contents/Resources/Documents')
-	with open(out + '.docset/Contents/Info.plist', 'w') as plist:
-		plist.write(getPlist(out))
-	with sqlite3.connect(out + '.docset/Contents/Resources/docSet.dsidx') as db:
-		db.execute("BEGIN")
-		db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT);')
-		db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, type, path);')
-		fldre = re.compile(r'\w*(\d)\w*')
-		manfre = re.compile(r'(.+)\..+')
-		#dups = set()
+class DocsetMaker:
+	fldre  = re.compile(r'\w*(\d)\w*')
+	manfre = re.compile(r'(.+)\..+')
+	
+	def __init__(self, outname):
+		self.outname = outname
+		self.dups = set()
+	
+	def __enter__(self):
+		os.makedirs(self.outname + '.docset/Contents/Resources/Documents')
+		self.db = sqlite3.connect(self.outname + '.docset/Contents/Resources/docSet.dsidx')
+		self.db.execute('CREATE TABLE searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT);')
+		self.db.execute('CREATE UNIQUE INDEX anchor ON searchIndex (name, type, path);')
+		with open(self.outname + '.docset/Contents/Info.plist', 'w') as plist:
+			plist.write(getPlist(self.outname))
+		return self
+	
+	def __exit__(self, *oth):
+		self.db.close()
+		
+	def addToDocset(self, indir):
+		self.db.execute("BEGIN")
 		for it in os.listdir(indir):
 			path1 = os.path.join(indir, it)
 			if os.path.isdir(path1):
-				mo = re.match(fldre, it)
+				mo = re.match(DocsetMaker.fldre, it)
 				if mo:
 					print('dir', it)
-					outdir = out + '.docset/Contents/Resources/Documents/' + it
+					outdir = self.outname + '.docset/Contents/Resources/Documents/' + it
 					os.mkdir(outdir)
 					for jt in os.listdir(path1):
 						manf = os.path.join(path1, jt)
 						if os.path.isfile(manf):
 							print('\tmanf', jt)
-							toHtml(manf, outdir)
 							fname = os.path.join(it, os.path.basename(manf)) + '.html'
-							name_for_db = re.match(manfre, jt).group(1)
-							mannumstr = mo.group(1)
-							dashtype = getType(mannumstr)
-							if dashtype == 'Object':
-								#if name_for_db in dups:
-									#print("DUP", name_for_db)
-								pass#name_for_db += ' ({})'.format(mannumstr)
-								#dups.add(name_for_db)
-							db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
-									[name_for_db, dashtype, fname])
-		db.commit()
+							name_for_db = re.match(DocsetMaker.manfre, jt).group(1)
+							mannum = int(mo.group(1))
+							dashtype = getType(mannum)
+							new_el = (mannum, name_for_db)
+							if not (new_el in self.dups):
+								toHtml(manf, outdir)
+								self.db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
+										[name_for_db, dashtype, fname])
+								self.dups.add(new_el)
+							else:
+								print('duplicate skipped',fname)
+		self.db.commit()
 
 def main():
-	if os.name != 'posix':
-		print('only posix is supported')
-		sys.exit(1)
 	argp = argparse.ArgumentParser()
-	argp.add_argument('-p', '--path', help='path with unpacked archive', required=True)
-	argp.add_argument('-o', '--out', help='outpath', required=True)
-	argp.add_argument('-f', help='force outdir', type=bool, default=True)
+	argp.add_argument('-p', '--paths', help='paths with unpacked archive, order matters', nargs='+', required=True)
+	argp.add_argument('-o', '--out', help='new docset name', required=True)
+	argp.add_argument('-f', help='force outdir', action='store_true')
+	argp.add_argument('-i', help='x1 icon (16x16)', metavar='icon.png')
+	argp.add_argument('-I', help='x2 icon (32x32)', metavar='icon@2x.png')
 	args = argp.parse_args()
-	if os.path.exists(args.out + '.docset'):
+	outpath = args.out + '.docset'
+	if os.path.exists(outpath):
 		if args.f:
-			rmtree(args.out + '.docset')
+			shutil.rmtree(outpath)
 		else:
-			print('path already exists, exiting')
+			print('path already exists, exiting (use "-f" to ignore this)')
 			sys.exit(1)
-	createDocset(args.path, args.out)
+	with DocsetMaker(args.out) as dsm:
+		for path in args.paths:
+			dsm.addToDocset(path)
+	for name,path in [('icon.png', args.i), ('icon@2x.png', args.I)]:
+		if path:
+			shutil.copyfile(path, os.path.join(outpath, name))
 	
 if __name__ == '__main__':
 	main()
