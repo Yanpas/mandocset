@@ -8,7 +8,7 @@ DocsetMaker
 @author: yanpas
 '''
 
-import sqlite3, argparse, os, sys, re, subprocess
+import sqlite3, argparse, os, re, subprocess
 import shutil
 
 def getPlist(name):
@@ -17,16 +17,18 @@ def getPlist(name):
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>{0}</string>
+	<string>{}</string>
 	<key>CFBundleName</key>
-	<string>{0}</string>
+	<string>{}</string>
 	<key>DocSetPlatformFamily</key>
-	<string>{0}</string>
+	<string>{}</string>
 	<key>isDashDocset</key>
 	<true/>
 </dict>
 </plist>
-'''.format(name)
+'''.format(name.split('_')[0],
+		name.replace('_', ' '),
+		name.split('_')[0].lower())
 
 def toHtml(inf, outdir):
 	name = os.path.basename(inf)
@@ -88,7 +90,7 @@ class DocsetMaker:
 										[name_for_db, dashtype, fname])
 								self.dups.add(new_el)
 							else:
-								print('duplicate skipped',fname)
+								print('\tdup skipped',fname)
 		self.db.commit()
 
 def main():
@@ -99,13 +101,14 @@ def main():
 	argp.add_argument('-i', help='x1 icon (16x16)', metavar='icon.png')
 	argp.add_argument('-I', help='x2 icon (32x32)', metavar='icon@2x.png')
 	args = argp.parse_args()
+	if ' ' in args.out:
+		exit('spaces are forbidden in outname')
 	outpath = args.out + '.docset'
 	if os.path.exists(outpath):
 		if args.f:
 			shutil.rmtree(outpath)
 		else:
-			print('path already exists, exiting (use "-f" to ignore this)')
-			sys.exit(1)
+			exit('path already exists, exiting (use "-f" to ignore this)')
 	with DocsetMaker(args.out) as dsm:
 		for path in args.paths:
 			dsm.addToDocset(path)
