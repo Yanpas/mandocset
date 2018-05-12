@@ -30,8 +30,14 @@ def getPlist(name):
 		name.replace('_', ' '),
 		name.split('_')[0].lower())
 
+def rmSuffix(name):
+	for suff in ['gz', 'bz2']:
+		if name.endswith('.'+suff):
+			name = ''.join(name.rsplit('.'+suff, 1)) # same as rreplace
+	return name
+
 def toHtml(inf, outdir):
-	name = os.path.basename(inf)
+	name = rmSuffix(os.path.basename(inf))
 	subp = subprocess.Popen(['man2html', inf, '-r'], stdout=subprocess.PIPE)
 	subp.stdout.readline() # skip Content-Type http header
 	with open(os.path.join(outdir, name) + '.html', 'wb') as f:
@@ -54,6 +60,7 @@ class DocsetMaker:
 	def __init__(self, outname):
 		self.outname = outname
 		self.dups = set()
+		self.db = None
 
 	def __enter__(self):
 		os.makedirs(self.outname + '.docset/Contents/Resources/Documents')
@@ -67,6 +74,25 @@ class DocsetMaker:
 	def __exit__(self, *oth):
 		self.db.close()
 
+	def scanDirectory(self, path1, it, mannum):
+		outdir = self.outname + '.docset/Contents/Resources/Documents/' + it
+		os.makedirs(outdir, exist_ok=True)
+		for jt in os.listdir(path1):
+			manf = os.path.join(path1, jt)
+			if os.path.isfile(manf) and re.match(DocsetMaker.manfre, jt):
+				print('\tman', jt)
+				fname = os.path.join(it, os.path.basename(manf)) + '.html'
+				name_for_db = re.match(DocsetMaker.manfre, jt).group(1)
+				dashtype = getType(mannum)
+				new_el = (mannum, name_for_db)
+				if not (new_el in self.dups):
+					toHtml(manf, outdir)
+					self.db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
+							[name_for_db, dashtype, rmSuffix(fname)])
+					self.dups.add(new_el)
+				else:
+					print('\tduplicate skipped',fname)
+
 	def addToDocset(self, indir):
 		self.db.execute("BEGIN")
 		for it in os.listdir(indir):
@@ -75,24 +101,7 @@ class DocsetMaker:
 				mo = re.match(DocsetMaker.fldre, it)
 				if mo:
 					print('dir', it)
-					outdir = self.outname + '.docset/Contents/Resources/Documents/' + it
-					os.makedirs(outdir, exist_ok=True)
-					for jt in os.listdir(path1):
-						manf = os.path.join(path1, jt)
-						if os.path.isfile(manf) and re.match(DocsetMaker.manfre, jt):
-							print('\tmanf', jt)
-							fname = os.path.join(it, os.path.basename(manf)) + '.html'
-							name_for_db = re.match(DocsetMaker.manfre, jt).group(1)
-							mannum = int(mo.group(1))
-							dashtype = getType(mannum)
-							new_el = (mannum, name_for_db)
-							if not (new_el in self.dups):
-								toHtml(manf, outdir)
-								self.db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
-										[name_for_db, dashtype, fname])
-								self.dups.add(new_el)
-							else:
-								print('\tdup skipped',fname)
+					self.scanDirectory(path1, it, int(mo.group(1)))
 		self.db.commit()
 
 def main():
