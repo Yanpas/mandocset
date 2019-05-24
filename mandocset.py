@@ -8,10 +8,10 @@ DocsetMaker
 @author: yanpas
 '''
 
-import sqlite3, argparse, os, re, subprocess
+import sqlite3, argparse, os, re, subprocess, sys
 import shutil
 
-def getPlist(name):
+def getPlist(name: str) -> str:
 	return '''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -30,18 +30,25 @@ def getPlist(name):
 		name.replace('_', ' '),
 		name.split('_')[0].lower())
 
-def rmSuffix(name):
+def rmSuffix(name: str) -> str:
 	for suff in ['gz', 'bz2']:
 		if name.endswith('.'+suff):
 			name = ''.join(name.rsplit('.'+suff, 1)) # same as rreplace
 	return name
 
-def toHtml(inf, outdir):
+def toHtml(inf: str, outdir: str):
 	name = rmSuffix(os.path.basename(inf))
-	subp = subprocess.Popen(['man2html', inf, '-r'], stdout=subprocess.PIPE)
+	inf_f = open(inf)
+	for suff, decoder in [('.gz', 'gzip'), ('.bz2', 'bzip2')]:
+		if inf.endswith(suff):
+			inf_f = subprocess.Popen([decoder, '-d'], stdin=inf_f, stdout=subprocess.PIPE).stdout
+			break
+	subp = subprocess.Popen(['man2html', '-r'], stdout=subprocess.PIPE, stdin=inf_f)
 	subp.stdout.readline() # skip Content-Type http header
 	with open(os.path.join(outdir, name) + '.html', 'wb') as f:
 		f.write(subp.stdout.read())
+	if subp.wait() != 0:
+		print("man2html error:", subp.returncode, file=sys.stderr)
 
 def getType(n):
 	if n == 1:

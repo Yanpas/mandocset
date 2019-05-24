@@ -2,6 +2,8 @@
 
 This is python script (mandocset.py) that generates Dash docset from man pages. It takes folders with man pages as it's arguments. Then in each folder it finds all folders, containing digit in their name, runs `man2html -r` for each file inside them.
 
+You can even generate docset of all manpages on your system (script supports mans compressed with gzip or bzip2), usually they are located at `/usr/share/man`.
+
 ### Some links to man pages
 * [manpages-posix](https://launchpad.net/ubuntu/+source/manpages-posix)
 * linux man pages' [git](https://www.kernel.org/doc/man-pages/)
