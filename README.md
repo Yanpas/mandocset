@@ -4,6 +4,8 @@ This is python script (mandocset.py) that generates Dash docset from man pages. 
 
 You can even generate docset of all manpages on your system (script supports mans compressed with gzip or bzip2), usually they are located at `/usr/share/man`.
 
+By default script uses man2html utility. If you prefer pandoc just use `-e "pandoc -f man -t html"`.
+
 ### Some links to man pages
 * [manpages-posix](https://launchpad.net/ubuntu/+source/manpages-posix)
 * linux man pages' [git](https://www.kernel.org/doc/man-pages/)

@@ -10,6 +10,7 @@ DocsetMaker
 
 import sqlite3, argparse, os, re, subprocess, sys
 import shutil
+from typing import List
 
 def getPlist(name: str) -> str:
 	return '''<?xml version="1.0" encoding="UTF-8"?>
@@ -30,25 +31,22 @@ def getPlist(name: str) -> str:
 		name.replace('_', ' '),
 		name.split('_')[0].lower())
 
-def rmSuffix(name: str) -> str:
-	for suff in ['gz', 'bz2']:
-		if name.endswith('.'+suff):
-			name = ''.join(name.rsplit('.'+suff, 1)) # same as rreplace
-	return name
-
-def toHtml(inf: str, outdir: str):
-	name = rmSuffix(os.path.basename(inf))
+def toHtml(executable: List[str], inf: str, outdir: str, basedir: str):
+	name = os.path.basename(inf)
 	inf_f = open(inf)
 	for suff, decoder in [('.gz', 'gzip'), ('.bz2', 'bzip2')]:
 		if inf.endswith(suff):
+			name = ''.join(name.rsplit(suff, 1))
 			inf_f = subprocess.Popen([decoder, '-d'], stdin=inf_f, stdout=subprocess.PIPE).stdout
 			break
-	subp = subprocess.Popen(['man2html', '-r'], stdout=subprocess.PIPE, stdin=inf_f)
+	subp = subprocess.Popen(executable, stdout=subprocess.PIPE, stdin=inf_f)
 	subp.stdout.readline() # skip Content-Type http header
-	with open(os.path.join(outdir, name) + '.html', 'wb') as f:
+	outpath = os.path.join(basedir, name) + '.html'
+	with open(os.path.join(outdir, outpath), 'wb') as f:
 		f.write(subp.stdout.read())
 	if subp.wait() != 0:
-		print("man2html error:", subp.returncode, file=sys.stderr)
+		print(executable[0], "error:", subp.returncode, file=sys.stderr)
+	return outpath
 
 def getType(n):
 	if n == 1:
@@ -64,10 +62,11 @@ class DocsetMaker:
 	fldre  = re.compile(r'\w*(\d)\w*')
 	manfre = re.compile(r'(.+)\..*?\d.*')
 
-	def __init__(self, outname):
+	def __init__(self, outname, executable: str):
 		self.outname = outname
 		self.dups = set()
 		self.db = None
+		self.executable = executable.split()
 
 	def __enter__(self):
 		os.makedirs(self.outname + '.docset/Contents/Resources/Documents')
@@ -82,8 +81,8 @@ class DocsetMaker:
 		self.db.close()
 
 	def scanDirectory(self, path1, it, mannum):
-		outdir = self.outname + '.docset/Contents/Resources/Documents/' + it
-		os.makedirs(outdir, exist_ok=True)
+		outbase = self.outname + '.docset/Contents/Resources/Documents'
+		os.makedirs(os.path.join(outbase, it), exist_ok=True)
 		for jt in os.listdir(path1):
 			manf = os.path.join(path1, jt)
 			if os.path.isfile(manf) and re.match(DocsetMaker.manfre, jt):
@@ -93,9 +92,9 @@ class DocsetMaker:
 				dashtype = getType(mannum)
 				new_el = (mannum, name_for_db)
 				if not (new_el in self.dups):
-					toHtml(manf, outdir)
+					outpath = toHtml(self.executable, manf, outbase, it)
 					self.db.execute('INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES (?,?,?);',
-							[name_for_db, dashtype, rmSuffix(fname)])
+							[name_for_db, dashtype, outpath])
 					self.dups.add(new_el)
 				else:
 					print('\tduplicate skipped',fname)
@@ -112,12 +111,15 @@ class DocsetMaker:
 		self.db.commit()
 
 def main():
-	argp = argparse.ArgumentParser()
+	argp = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	argp.add_argument('-p', '--paths', help='paths with unpacked archive, order matters', nargs='+', required=True)
 	argp.add_argument('-o', '--out', help='new docset name', required=True)
 	argp.add_argument('-f', help='force outdir', action='store_true')
 	argp.add_argument('-i', help='x1 icon (16x16)', metavar='icon.png')
 	argp.add_argument('-I', help='x2 icon (32x32)', metavar='icon@2x.png')
+	argp.add_argument('-e', default='man2html -r',
+		help=('Executable with arguments which reads from stdin and writes to stdout.'
+			' Alterntaively "pandoc -f man -t html" may be used'))
 	args = argp.parse_args()
 	if ' ' in args.out:
 		exit('spaces are forbidden in outname')
@@ -127,7 +129,7 @@ def main():
 			shutil.rmtree(outpath)
 		else:
 			exit('path already exists, exiting (use "-f" to ignore this)')
-	with DocsetMaker(args.out) as dsm:
+	with DocsetMaker(args.out, args.e) as dsm:
 		for path in args.paths:
 			dsm.addToDocset(path)
 	for name,path in [('icon.png', args.i), ('icon@2x.png', args.I)]:
