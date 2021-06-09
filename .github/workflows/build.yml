@@ -6,11 +6,14 @@ name: Build-Linux-man-pages
 on: [push, pull_request, create]
 
 env:
-  VERSION: "5.11"
-  SRC: "https://mirrors.edge.kernel.org/pub/linux/docs/man-pages/"
+  LINUX_VERSION: "5.11"
+  LINUX_SRC: "https://mirrors.edge.kernel.org/pub/linux/docs/man-pages/"
   # It's not possible to access env in the same environment https://github.community/t/how-to-use-env-context/16975/2
-  FILE: 'man-pages-$VERSION.tar.xz'
-
+  LINUX_FILE: 'man-pages-$LINUX_VERSION.tar.xz'
+  POSIX_VERSION: "2017"
+  POSIX_SRC: "https://mirrors.edge.kernel.org/pub/linux/docs/man-pages/man-pages-posix/"
+  # It's not possible to access env in the same environment https://github.community/t/how-to-use-env-context/16975/2
+  POSIX_FILE: 'man-pages-posix-$POSIX_VERSION-a.tar.xz'
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -38,13 +41,18 @@ jobs:
           zip
 
       # Runs a set of commands using the runners shell
-      - name: Download and unpack
+      - name: Download and unpack Linux
         run: |
-            wget -nv "$SRC/${{env.FILE}}"
-            tar xvf ${{env.FILE}}
+            wget -nv "$LINUX_SRC/${{env.LINUX_FILE}}"
+            tar xvf ${{env.LINUX_FILE}}
+
+      - name: Download and unpack POSIX
+        run: |
+            wget -nv "$POSIX_SRC/${{env.POSIX_FILE}}"
+            tar xvf ${{env.POSIX_FILE}}
 
       - name: Build
-        run: python3 mandocset.py -o Linux -p man-pages-$VERSION -i etc/tux.png -I etc/tux@2x.png 
+        run: python3 mandocset.py -o Linux -p man-pages-$LINUX_VERSION man-pages-posix-$POSIX_VERSION -i etc/tux.png -I etc/tux@2x.png 
 
       - name: Pack
         run: zip -r Linux.zip Linux.docset
