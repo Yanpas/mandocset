@@ -33,13 +33,9 @@ def getPlist(name: str) -> str:
 
 def toHtml(executable: List[str], inf: str, outdir: str, basedir: str):
 	name = os.path.basename(inf)
-	inf_f = open(inf)
-	for suff, decoder in [('.gz', 'gzip'), ('.bz2', 'bzip2')]:
-		if inf.endswith(suff):
-			name = ''.join(name.rsplit(suff, 1))
-			inf_f = subprocess.Popen([decoder, '-d'], stdin=inf_f, stdout=subprocess.PIPE).stdout
-			break
-	subp = subprocess.Popen(executable, stdout=subprocess.PIPE, stdin=inf_f)
+	cmd = executable.copy()
+	cmd.append(inf)
+	subp = subprocess.Popen(cmd, stdout=subprocess.PIPE)
 	subp.stdout.readline() # skip Content-Type http header
 	outpath = os.path.join(basedir, name) + '.html'
 	with open(os.path.join(outdir, outpath), 'wb') as f:

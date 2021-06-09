@@ -1,2 +1,4 @@
 resource
 .vscode
+man-pages-*
+*.docset
