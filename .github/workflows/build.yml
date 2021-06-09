@@ -3,7 +3,14 @@
 name: Build-Linux-man-pages
 
 # Controls when the action will run. 
-on: [push, pull_request, create]
+on: 
+  push: 
+  pull_request: 
+  create:
+    tags:
+      - "*"
+
+
 
 env:
   LINUX_VERSION: "5.11"
