@@ -1,6 +1,6 @@
 # mandocset
 
-This is Python script (`mandocset.py`) that generates a Dash docset from man pages. It takes folders with man pages as its arguments. Then in each folder it finds all folders containing digit in their name, and runs `man2html -r` for each file inside them.
+This is a Python script ([`mandocset.py`](mandocset.py)) that generates a Dash docset from man pages. It takes folders with man pages as its arguments. Then in each folder it finds all folders containing digit in their name, and runs `man2html -r` for each file inside them.
 
 By default the script uses the `man2html` utility, which should be available from your distro's package manager. If you prefer [Pandoc][1], add `-e "pandoc -f man -t html"` to the command line.
 
@@ -24,11 +24,11 @@ You may also view help: `python3 mandocset.py -h`.
 
 You can generate a docset of all manpages on your system (the script supports manpages compressed with gzip or bzip2). Usually these are located at `/usr/share/man`.
 
-On a reasonably well-equipped Linux system, the Makefile can do this for you:
+On a reasonably well-equipped Linux system, the [included Makefile](Makefile) can do this for you:
 
 ```bash
 cd ~/path/where/you/cloned/Yanpas/mandocset
-make docset
+make  # or 'make docset'
 
 # if the above works OK
 make install
@@ -36,7 +36,7 @@ make install
 # print what would happen, but don't actually do it
 make install DRYRUN=1
 
-# remove previously-installed docsets
+# remove the previously-built docset
 make reallyclean
 
 # specify custom docset name and search shortcut (or just modify the Makefile)
